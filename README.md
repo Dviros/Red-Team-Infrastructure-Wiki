@@ -1,4 +1,4 @@
-This wiki is intended to provide a resources for setting up a resilient Red Team infrastructure. It was made to complement Steve Borosh ([@424f424f](https://twitter.com/424f424f)) and Jeff Dimmock's ([@bluscreenofjeff](https://twitter.com/bluscreenofjeff)) BSides NoVa 2017 talk "Doomsday Preppers: Fortifying Your Red Team Infrastructure" ([slides](https://speakerdeck.com/rvrsh3ll/doomsday-preppers-fortifying-your-red-team-infrastructure))
+This wiki is intended to provide a resource for setting up a resilient Red Team infrastructure. It was made to complement Steve Borosh ([@424f424f](https://twitter.com/424f424f)) and Jeff Dimmock's ([@bluscreenofjeff](https://twitter.com/bluscreenofjeff)) BSides NoVa 2017 talk "Doomsday Preppers: Fortifying Your Red Team Infrastructure" ([slides](https://speakerdeck.com/rvrsh3ll/doomsday-preppers-fortifying-your-red-team-infrastructure))
 
 If you have an addition you'd like to make, please submit a Pull Request or file an issue on the repo.
 
@@ -27,9 +27,10 @@ THANK YOU to all of the authors of the content referenced in this wiki and to al
     - [socat for DNS](#socat-for-dns)
     - [iptables for DNS](#iptables-for-dns)
   - [HTTP(S)](#https)
-    - [socat vs mod_rewrite](#socat-vs-modrewrite)
+    - [socat vs mod_rewrite](#socat-vs-mod_rewrite)
     - [socat for HTTP](#socat-for-http)
     - [iptables for HTTP](#iptables-for-http)
+    - [ssh for HTTP](#ssh-for-http)
     - [Payloads and Web Redirection](#payloads-and-web-redirection)
     - [C2 Redirection](#c2-redirection)
       - [C2 Redirection with HTTPS](#c2-redirection-with-https)
@@ -91,20 +92,23 @@ Here is a sample design, keeping functional segregation and redirector usage in 
 
 * [How to Build a C2 Infrastructure with Digital Ocean – Part 1 - Lee Kagan (@invokethreatguy)](https://www.blackhillsinfosec.com/build-c2-infrastructure-digital-ocean-part-1/)
 
+* [Automated Red Team Infrastructure Deployment with Terraform - Part 1 - Rasta Mouse (@_RastaMouse)](https://rastamouse.me/2017/08/automated-red-team-infrastructure-deployment-with-terraform---part-1/)
+
+
 # Domains
-Domain reputation will vary greatly depending on the products your target is using, as well as their configuration. As such, choosing a domain that will work on your target is not an exact science. Open source intelligence gathering (OSINT) will be critical in helping make a best guess at the state of controls and which resources to check domains against. Luckily, online advertisers face the same problems and have created some solutions we can leverage.
+Perceived domain reputation will vary greatly depending on the products your target is using, as well as their configuration. As such, choosing a domain that will work on your target is not an exact science. Open source intelligence gathering (OSINT) will be critical in helping make a best guess at the state of controls and which resources to check domains against. Luckily, online advertisers face the same problems and have created some solutions we can leverage.
 
 [expireddomains.net](http://expireddomains.net) is a search engine for recently expired or dropped domains. It provides search and advanced filtering, such as age of expiration, number of backlinks, number of Archive.org snapshots, [SimilarWeb](https://www.similarweb.com/) score. Using the site, we can register pre-used domains, which will come with domain age, that look similar to our target, look similar to our impersonation, or simply are likely to blend in on our target’s network.
 
 ![expireddomains.net](./images/expired-domains.png)
 
-When choosing a domain for C2 or data exfiltration, consider choosing a domain categorized as Finance or Healthcare. Many organizations will not perform SSL middling on those categories due to the possibility of legal or data sensitivity issues.
+When choosing a domain for C2 or data exfiltration, consider choosing a domain categorized as Finance or Healthcare. Many organizations will not perform SSL middling on those categories due to the possibility of legal or data sensitivity issues. It is also important to ensure your chosen domain is not associated with any previous malware or phishing campaigns.
 
 The tool [CatMyFish](https://github.com/Mr-Un1k0d3r/CatMyFish) by Charles Hamilton([@MrUn1k0d3r](https://twitter.com/mrun1k0d3r)) automates searches and web categorization checking with expireddomains.net and BlueCoat. It can be modified to apply more filters to searches or even perform long term monitoring of assets you register.
 
-Another tool, [DomainHunter](https://github.com/minisllc/domainhunter) by Joe Vest ([@joevest](https://twitter.com/joevest)) & Andrew Chiles ([@andrewchiles](https://twitter.com/andrewchiles)), builds on what CatMyFish did and returns BlueCoat and IBM X-Force categorization, domain age, alternate available TLDs, Archive.org links, and an HTML report. Check out the [blog post](http://threatexpress.com/2017/03/leveraging-expired-domains-for-red-team-engagements/) about the tool's release for more details.
+Another tool, [DomainHunter](https://github.com/minisllc/domainhunter) by Joe Vest ([@joevest](https://twitter.com/joevest)) & Andrew Chiles ([@andrewchiles](https://twitter.com/andrewchiles)), returns BlueCoat/WebPulse, IBM X-Force, and Cisco Talos categorization, domain age, alternate available TLDs, Archive.org links, and an HTML report. Additionally, it performs checks for use in known malware and phishing campaigns using Malwaredomains.com and MXToolBox. This tool also includes OCR support for bypassing the BlueCoat/WebPulse captchas. Check out the [blog post](http://threatexpress.com/2017/03/leveraging-expired-domains-for-red-team-engagements/) about the tool's initial release for more details. 
 
-Yet another tool, [AIRMASTER](https://github.com/t94j0/AIRMASTER) by [Max Harley (@Max_68)](https://twitter.com/@Max_68) uses expireddomains.net and Bluecoat to find categorized domains. This tool uses OCR to bypass the Bluecoat captcha, increasing the search speed.
+Yet another tool, [AIRMASTER](https://github.com/t94j0/AIRMASTER) by [Max Harley (@Max_68)](https://twitter.com/@Max_68) uses expireddomains.net and Bluecoat to find categorized domains. This tool uses OCR to bypass the BlueCoat captcha, increasing the search speed.
 
 If a previously-registered domain isn't available or you would prefer a self-registered domain, it's possible to categorize domains yourself. Using the direct links below or a tool like [Chameleon](https://github.com/mdsecactivebreach/Chameleon) by Dominic Chell ([@domchell](https://twitter.com/domchell)). Most categorization products will overlook redirects or cloned content when determining the domain's categorization. For more information about Chameleon usage, check out Dominic's post [Categorisation is not a security boundary](https://www.mdsec.co.uk/2017/07/categorisation-is-not-a-security-boundary/).
 
@@ -136,18 +140,14 @@ Once you have a domain that passes the proper checks listed in the previous sect
 
 ![DNS Setup](./images/setup_dns_a_record_for_ssl.PNG)
 
-Next, ssh into your phishing server and download the following script to setup the first half of your infrastructure. [Postfix-Server-Setup-Script](https://github.com/n0pe-sled/Postfix-Server-Setup)
-Set the script to executable such as "chmod +x ServerSetup.sh". Now we can run the setup script and begin the setup by selecting either option to prep your Debian or Ubuntu image, install the proper dependencies, and set the hostname.
+Next, ssh into your phishing server and make sure you have a proper FQDN hostname listed in your /etc/hosts.
+Example "127.0.0.1 email.yourphishingserver.com email localhost"
 
-![Setup Script](./images/setup_script.PNG)
+Now, you're going to install the web front-end to phish from in just a few easy steps. Start by downloading the latest "BETA" version of [iRedMail](http://www.iredmail.org/download.html) onto your phishing server. Easy way is to right click the download button, copy the link address, use wget to download directly onto your phishing server. Next, untar it "tar -xvf iRedMail-0.9.8-beta2.tar.bz2". Navigate into the unpacked folder and make the iRedMail.sh script executable (chmod +x iRedMail.sh). Execute the script as root, follow the prompts, and you'll need to reboot to finish everything.
 
-The server will reboot. SSH back into the server and run the script again. This time, select option 4 to install a LetsEncrypt cert. Make sure you have your A records set and propogated by now. Follow the prompts and you should be greeted with a message letting you know that the certificates were created sucessfully.
+You'll want to make sure you have all the proper DNS records ponting to your mail server. (https://docs.iredmail.org/setup.dns.html). For DKIM, the new command should be "amavisd-new showkeys" to list your DKIM key.
 
-![Cert Creation](./images/cert-creation.PNG)
-
-Next, we follow script option 5 to setup the mail server. Again, follow the prompts and you'll be set with a working mail server. Now, you should follow script option 7 to get get the DNS entries that you'll need to add to your DNS records. Tip: the script outputs those entries in the file dnsentries.txt.
-
-You're done, with part 1. Next, you're going to install the web front-end to phish from in just a few easy steps. Start by downloading the latest version of [iRedMail](http://www.iredmail.org/download.html) onto your phishing server. Easy way is to right click the download button, copy the link address, use wget to download directly onto your phishing server. Next, unpack it. You may need to install the bzip2 archiving program. Navigate into the unpacked folder and make the iRedMail.sh script executable (chmod +x iRedMail.sh). Execute the script as root, follow the prompts, and login to your iRedMail server dashboard!
+For DMARC we can use (https://www.unlocktheinbox.com/dmarcwizard/) to generate our dmarc entry.
 
 ![iRedMail Dashboard](./images/iredadmin_dashboard.PNG)
 
@@ -227,6 +227,7 @@ Phish-Domain *TAB* RELAY
 #### Configure a catch-all address
 This will relay any email received to *@phishdomain.com to a chosen email address. This is highly useful to receive any responses or bounce-backs to a phishing email.
 
+
 ```bash
 echo PHISH-DOMAIN >> /etc/mail/local-host-names
 ```
@@ -285,7 +286,7 @@ sysctl net.ipv4.ip_forward=1
 Also, change "FORWARD" chain policy to "ACCEPT"
 
 ### DNS redirection can also be done behind NAT
-Some may have the requirement or need to host a c2 server on an internal network. Using a combination of IPTABLES, SOCAT, and reverse ssh tunnels, we can certainly acheive this in the following manner.
+Some may have the requirement or need to host a c2 server on an internal network. Using a combination of IPTABLES, SOCAT, and reverse ssh tunnels, we can certainly achieve this in the following manner.
 
 ![Sample DNS NAT Setup](./images/dns_nat.png)
 
@@ -330,6 +331,34 @@ iptables -P FORWARD ACCEPT
 sysctl net.ipv4.ip_forward=1
 ```
 
+### SSH for HTTP
+
+We have previously covered using SSH for DNS tunnels. SSH works as a solid, and robust means to break through NAT and obtain a way for the implant to connect to a redirector and into your server environment. Before setting up an SSH redirector, you must add the following lines to `/etc/ssh/sshd_config`:
+
+```text
+# Allow the SSH client to specify which hosts may connect
+GatewayPorts yes
+
+# Allow both local and remote port forwards
+AllowTcpForwarding yes
+```
+
+To forward the redirector's local port 80 to your internal teamsrver, use the following syntax on the internal server:
+
+```
+tmux new -S redir80
+ssh <redirector> -R *:80:localhost:80
+Ctrl+B, D
+```
+
+You can also forward more than one port, for example if you want 443 and 80 to be open all at once:
+
+```
+tmux new -S redir80443
+ssh <redirector> -R *:80:localhost:80 -R *:443:localhost:443
+Ctrl+B, D
+```
+
 ### Payloads and Web Redirection
 
 When serving payload and web resources, we want to minimize the ability for incident responders to review files and increase the chances of successfully executing the payload, whether to establish C2 or gather intelligence.
@@ -345,8 +374,11 @@ Apache Mod_Rewrite usage and examples by Jeff Dimmock:
 * [Apache mod_rewrite Grab Bag](https://bluescreenofjeff.com/2016-12-23-apache_mod_rewrite_grab_bag/)
 * [Serving Random Payloads with Apache mod_rewrite](https://bluescreenofjeff.com/2017-06-13-serving-random-payloads-with-apache-mod_rewrite/)
 
-Serving random payloads with NGINX:
-[Gist by jivoi](https://gist.github.com/jivoi/a33ace2e25515a31aa2ffbae246d98c9)
+Other Apache mod_rewrite usage and examples:
+
+* [mod_rewrite rule to evade vendor sandboxes from Jason Lang @curi0usjack](https://gist.github.com/curi0usJack/971385e8334e189d93a6cb4671238b10) 
+
+* [Serving random payloads with NGINX - Gist by jivoi](https://gist.github.com/jivoi/a33ace2e25515a31aa2ffbae246d98c9)
 
 To automatically set up Apache Mod_Rewrite on a redirector server, check out Julain Catrambone's ([@n0pe_sled](https://twitter.com/n0pe_sled)) blog post [Mod_Rewrite Automatic Setup](https://blog.inspired-sec.com/archive/2017/04/17/Mod-Rewrite-Automatic-Setup.html) and the [accompanying tool](https://github.com/n0pe-sled/Apache2-Mod-Rewrite-Setup).
 
@@ -355,7 +387,9 @@ To automatically set up Apache Mod_Rewrite on a redirector server, check out Jul
 The intention behind redirecting C2 traffic is twofold: obscure the backend team server and appear to be a legitimate website if browsed to by an incident responder. Through the use of Apache mod_rewrite and [customized C2 profiles](#modifying-c2-traffic) or other proxying (such as with Flask), we can reliably filter the real C2 traffic from investigative traffic.
 
 * [Cobalt Strike HTTP C2 Redirectors with Apache mod_rewrite - Jeff Dimmock](https://bluescreenofjeff.com/2016-06-28-cobalt-strike-http-c2-redirectors-with-apache-mod_rewrite/)
+* [Securing your Empire C2 with Apache mod_rewrite - Gabriel Mathenge (@_theVIVI)](https://thevivi.net/2017/11/03/securing-your-empire-c2-with-apache-mod_rewrite/)
 * [Expand Your Horizon Red Team – Modern SAAS C2 - Alex Rymdeko-Harvey (@killswitch-gui)](https://cybersyndicates.com/2017/04/expand-your-horizon-red-team/)
+* [Hybrid Cobalt Strike Redirectors](https://zachgrace.com/2018/02/20/cobalt_strike_redirectors.html) - [Zach Grace (@ztgrace)](https://twitter.com/ztgrace) and [@m0ther_](https://twitter.com/m0ther_)
 
 #### C2 Redirection with HTTPS
 
@@ -378,6 +412,7 @@ SSLProxyCheckPeerExpire off
 ```
 
 ### Other Apache mod_rewrite Resources
+* [Automating Apache mod_rewrite and Cobalt Strike Profiles](https://posts.specterops.io/automating-apache-mod-rewrite-and-cobalt-strike-malleable-c2-profiles-d45266ca642)
 * [mod-rewrite-cheatsheet.com](http://mod-rewrite-cheatsheet.com/)
 * [Official Apache 2.4 mod_rewrite Documentation](http://httpd.apache.org/docs/current/rewrite/)
 * [Apache mod_rewrite Introduction](https://httpd.apache.org/docs/2.4/en/rewrite/intro.html)
@@ -389,12 +424,15 @@ SSLProxyCheckPeerExpire off
 ## Cobalt Strike
 Cobalt Strike modifies its traffic with Malleable C2 profiles. Profiles provide highly-customizable options for modifying how your server’s C2 traffic will look on the wire. Malleable C2 profiles can be used to strengthen incident response evasion, impersonate known adversaries, or masquerade as legitimate internal applications used by the target.
 
-* [Malleable C2 Profiles - GitHub](https://github.com/rsmudge/Malleable-C2-Profiles)
+* [Official Malleable C2 Profiles - GitHub](https://github.com/rsmudge/Malleable-C2-Profiles)
 * [Malleable Command and Control Documentation - cobaltstrike.com](https://www.cobaltstrike.com/help-malleable-c2)
 * [Cobalt Strike 2.0 - Malleable Command and Control - Raphael Mudge](http://blog.cobaltstrike.com/2014/07/16/malleable-command-and-control/)
 * [Cobalt Strike 3.6 - A Path for Privilege Escalation - Raphael Mudge](http://blog.cobaltstrike.com/2016/12/08/cobalt-strike-3-6-a-path-for-privilege-escalation/)
 * [A Brave New World: Malleable C2 - Will Schroeder (@harmj0y)](http://www.harmj0y.net/blog/redteaming/a-brave-new-world-malleable-c2/)
 * [How to Write Malleable C2 Profiles for Cobalt Strike - Jeff Dimmock](https://bluescreenofjeff.com/2017-01-24-how-to-write-malleable-c2-profiles-for-cobalt-strike/)
+* [In-Memory Evasion (Video series) - Raphael Mudge](https://www.youtube.com/watch?v=lz2ARbZ_5tE&list=PL9HO6M_MU2nc5Q31qd2CwpZ8J4KFMhgnK)
+
+As you begin creating or modifying Malleable C2 profiles, it's important to keep data size limits for the Beacon info placement. For example, configuring the profile to send large amounts of data in a URL parameter will require many requests. For more information about this, check out Raphael Mudge's blog post [Beware of Slow Downloads](https://blog.cobaltstrike.com/2018/03/09/beware-of-slow-downloads/).
 
 
 ## Empire
@@ -418,16 +456,20 @@ Leveraging trusted, legitimate web services for C2 can provide a valuable leg-up
 
 ## Domain Fronting
 
-Domain Fronting is a technique used by censorship evasion services and apps to route traffic through legitimate and highly-trusted domains. Popular services that support Domain Fronting include [Google App Engine](https://cloud.google.com/appengine/), [Amazon CloudFront](https://aws.amazon.com/cloudfront/), and [Microsoft Azure](https://azure.microsoft.com/). In a nutshell, traffic uses the DNS and SNI name of the trusted service provider, Google is used in the example below. When the traffic is received by the Edge Server (ex: located at gmail.com), the packet is forwarded to the Origin Server (ex: phish.appspot.com) specified in the packet’s Host header. Depending on the service provider, the Origin Server will either directly forward traffic to a specified domain, which we’ll point to our team server, or a proxy app will be required to perform the final hop forwarding.
+Domain Fronting is a technique used by censorship evasion services and apps to route traffic through legitimate and highly-trusted domains. Popular services that support Domain Fronting include [Google App Engine](https://cloud.google.com/appengine/), [Amazon CloudFront](https://aws.amazon.com/cloudfront/), and [Microsoft Azure](https://azure.microsoft.com/). It's important to note that many providers, like [Google](https://arstechnica.com/information-technology/2018/04/google-disables-domain-fronting-capability-used-to-evade-censors/) and [Amazon](https://aws.amazon.com/blogs/security/enhanced-domain-protections-for-amazon-cloudfront-requests/) have implemented mitigations against Domain Fronting, so some linked resources or information provided in this wiki may be outdated by the time you try to use it.
+
+In a nutshell, traffic uses the DNS and SNI name of the trusted service provider, Google is used in the example below. When the traffic is received by the Edge Server (ex: located at gmail.com), the packet is forwarded to the Origin Server (ex: phish.appspot.com) specified in the packet’s Host header. Depending on the service provider, the Origin Server will either directly forward traffic to a specified domain, which we’ll point to our team server, or a proxy app will be required to perform the final hop forwarding.
 
 ![Domain Fronting Overview](./images/domain-fronting.png)
+
+
 
 For more detailed information about how Domain Fronting works, see the whitepaper [Blocking-resistant communication through domain fronting](https://www.bamsoftware.com/papers/fronting/) and the TOR Project’s [meek documentation](https://trac.torproject.org/projects/tor/wiki/doc/meek)
 
 In addition to the standard frontable domains, such as any google.com domain, it's possible to leverage other legitimate domains for fronting. 
 
 For more information about hunting frontable domains, check out:
-* [Domain Fronting via Cloudfront Alternate Domains - Vincenty Yiu (@vysecurity)](https://www.mdsec.co.uk/2017/02/domain-fronting-via-cloudfront-alternate-domains/)
+* [Domain Fronting via Cloudfront Alternate Domains - Vincent Yiu (@vysecurity)](https://www.mdsec.co.uk/2017/02/domain-fronting-via-cloudfront-alternate-domains/)
 * [Finding Domain frontable Azure domains - thoth / Fionnbharr (@a_profligate)](https://theobsidiantower.com/2017/07/24/d0a7cfceedc42bdf3a36f2926bd52863ef28befc.html)
 * [Google Groups: Blog post on finding 2000+ Azure domains using Censys](https://groups.google.com/forum/#!topic/traffic-obf/7ygIXCPebwQ)
 * [FindFrontableDomains tool - Steve Borosh (@rvrsh3ll)](https://github.com/rvrsh3ll/FindFrontableDomains)
@@ -439,6 +481,13 @@ For more information about hunting frontable domains, check out:
 * [Escape and Evasion Egressing Restricted Networks - Tom Steele (@_tomsteele) and Chris Patten](https://www.optiv.com/blog/escape-and-evasion-egressing-restricted-networks)
 * [Red Team Insights on HTTPS Domain Fronting Google Hosts Using Cobalt Strike](https://www.cyberark.com/threat-research-blog/red-team-insights-https-domain-fronting-google-hosts-using-cobalt-strike/) - [Will Vandevanter and Shay Nahari of CyberArk](https://www.cyberark.com)
 * [SSL Domain Fronting 101 - Steve Borosh (@424f424f)](http://www.rvrsh3ll.net/blog/offensive/ssl-domain-fronting-101/)
+* [How I Identified 93k Domain-Frontable CloudFront Domains - Chris Myers (@SWIZZLEZ_) and Barrett Adams (@PEEWPW)](https://www.peew.pw/blog/2018/2/22/how-i-identified-93k-domain-frontable-cloudfront-domains)
+* [Domain Fronting: Who Am I? - Vincent Yiu (@vysecurity)](https://medium.com/@vysec.private/domain-fronting-who-am-i-3c982ccd52e6)
+* [Validated CloudFront SSL Domains - Vincent Yiu (@vysecurity)](https://medium.com/@vysec.private/validated-cloudfront-ssl-domains-27895822cea3)
+* [CloudFront Hijacking](https://www.mindpointgroup.com/blog/pen-test/cloudfront-hijacking/) - [Matt Westfall (@disloops)](https://twitter.com/disloops)
+* [CloudFrunt GitHub Repo](https://github.com/MindPointGroup/cloudfrunt) - [MindPointGroup](https://github.com/MindPointGroup)
+* [Metasploit Domain Fronting With Microsoft Azure (@ch1gg1ns)](https://chigstuff.com/blog/metasploit-domain-fronting-with-microsoft-azure/)
+* [Alibaba CDN Domain Fronting - Vincent Yiu (@vysecurity)](https://medium.com/@vysec.private/alibaba-cdn-domain-fronting-1c0754fa0142)
 
 ## PaaS Redirectors
 Many PaaS and SaaS providers provide a static subdomain or URL for use with a provisioned instance. If the associated domain is generally highly trusted, the instances could provide extra trust to your C2 infrastructure over a purchased domain and VPS.
@@ -449,11 +498,22 @@ Specific implementation can vary greatly based on the service; however, for an e
 
 Another interesting technique that merits further research is the use of overly-permissive Amazon S3 buckets for C2. Check out the post [S3 Buckets for Good and Evil](https://pentestarmoury.com/2017/07/19/s3-buckets-for-good-and-evil/) by [Andrew Luke (@Sw4mp_f0x)](https://twitter.com/Sw4mp_f0x) for more details on how S3 buckets could be used for C2. This technique could be combined with the third-party C2 capabilities of Empire to use the target's legitimate S3 buckets against them.
 
+For another example of using PaaS for C2, check out [Databases and Clouds: SQL Server as a C2](https://blog.netspi.com/databases-and-clouds-sql-server-as-a-c2/) by Scott Sutherland ([@_nullbind](https://twitter.com/_nullbind)).
+
 ## Other Third-Party C2
 Other third-party services have been used in the wild for C2 in the past. Leveraging third-party websites that allow for the rapid posting or modification of user-generated content can help you evade reputation-based controls, especially if the third-party site is generally trusted.
 
 Check out these resources for other third-party C2 options:
 * [A stealthy Python based Windows backdoor that uses Github as a C&C server](http://securityblog.gr/4434/a-stealthy-python-based-windows-backdoor-that-uses-github-as-a-cc-server/) - [maldevel at securityblog.gr](http://securityblog.gr/author/gkarpouzas/)
+* [External C2 (Third-Party Command and Control) - Cobalt Strike Documentation](https://www.cobaltstrike.com/help-externalc2)
+* [Cobalt Strike over external C2 – beacon home in the most obscure ways](https://outflank.nl/blog/2017/09/17/blogpost-cobalt-strike-over-external-c2-beacon-home-in-the-most-obscure-ways/) - [Mark Bergman at outflank.nl](https://outflank.nl/blog/author/mark/)
+* [“Tasking” Office 365 for Cobalt Strike C2](https://labs.mwrinfosecurity.com/blog/tasking-office-365-for-cobalt-strike-c2) - [William Knowles (@william_knows)](https://twitter.com/william_knows)
+* [External C2 for Cobalt Strike](https://github.com/ryhanson/ExternalC2/) - [Ryan Hanson (@ryhanson)](https://twitter.com/ryhanson)
+* [External C2 framework for Cobalt Strike](http://www.insomniacsecurity.com/2018/01/11/externalc2.html) - [Jonathan Echavarria (@Und3rf10w)](https://twitter.com/und3rf10w)
+* [External C2 framework (GitHub Repo)](https://github.com/Und3rf10w/external_c2_framework) - [Jonathan Echavarria (@Und3rf10w)](https://twitter.com/und3rf10w)
+* [Hiding in the Cloud:
+Cobalt Strike Beacon C2 using Amazon APIs](https://rhinosecuritylabs.com/aws/hiding-cloudcobalt-strike-beacon-c2-using-amazon-apis/) - [Rhino Security Labs](https://rhinosecuritylabs.com)
+* [Exploring Cobalt Strike's ExternalC2 framework](https://blog.xpnsec.com/exploring-cobalt-strikes-externalc2-framework/) - [Adam (@_xpn_)](https://twitter.com/_xpn_)
 
 # Obscuring Infrastructure
 
@@ -469,6 +529,8 @@ For more details about how to do these and other tactics for multiple attack fra
 * [Empire – Modifying Server C2 Indicators](http://threatexpress.com/2017/05/empire-modifying-server-c2-indicators/) - [Andrew Chiles](https://twitter.com/andrewchiles)
 * [Hunting Red Team Empire C2 Infrastructure](http://www.chokepoint.net/2017/04/hunting-red-team-empire-c2.html) - [chokepoint.net](http://www.chokepoint.net/)
 * [Hunting Red Team Meterpreter C2 Infrastructure](http://www.chokepoint.net/2017/04/hunting-red-team-meterpreter-c2.html) - [chokepoint.net](http://www.chokepoint.net/)
+* [Identifying Empire HTTP Listeners (Tenable Blog)](https://www.tenable.com/blog/identifying-empire-http-listeners) - [Jacob Baines](https://www.tenable.com/profile/jacob-baines)
+* [Host Header Manipulation - Vincent Yiu (@vysecurity)](https://vincentyiu.co.uk/host-header-manipulation/)
 
 
 # Securing Infrastructure
@@ -496,13 +558,30 @@ Of course, this list is not exhaustive of what you can do to secure a team serve
 * [Securing Debian Manual](https://www.debian.org/doc/manuals/securing-debian-howto/)
 * [20 Linux Server Hardening Security Tips - nixCraft](https://www.cyberciti.biz/tips/linux-security.html)
 * [SANS Linux Security Checklists](https://www.sans.org/score/checklists/linux)
+* [Docker Your Command & Control (C2)](https://blog.obscuritylabs.com/docker-command-controll-c2/) - [Alex Rymdeko-Harvey (@killswitch_gui)](https://twitter.com/killswitch_gui)
+
+## Specific Hardening Resources
+There are a number of resources available online discussing the secure setup and design of infrastructures. Not every design consideration will be appropriate for every attack infrastructure, but it's useful to know what options are available and what other testers are doing. 
+
+Here are some of those resoources:
+
+* [Responsible Red Teams - Tim MalcomVetter (@malcomvetter)](https://medium.com/@malcomvetter/responsible-red-teams-1c6209fd43cc)
+* [Safe Red Team Infrastructure - Tim MalcomVetter (@malcomvetter)](https://medium.com/@malcomvetter/safe-red-team-infrastructure-c5d6a0f13fac)
+* [Red Team Infrastructure - AWS Encrypted EBS - @_rastamouse](https://rastamouse.me/2018/02/red-team-infrastructure---aws-encrypted-ebs/)
 
 # Automating Deployments
 The topics covered in this wiki strengthen attack infrastrctures, but generally require a good deal of time to design and implement. Automation can be used to greatly reduce deployment times, allowing you to deploy more complex setups in less time.
 
 Check out these resources about attack infrastructure automation:
 * [Automated Red Team Infrastructure Deployment with Terraform - Part 1](https://rastamouse.me/2017/08/automated-red-team-infrastructure-deployment-with-terraform---part-1/) - [@_RastaMouse](https://twitter.com/_RastaMouse)
+* [Automated Red Team Infrastructure Deployment with Terraform - Part 2](https://rastamouse.me/2017/09/automated-red-team-infrastructure-deployment-with-terraform---part-2/) - [@_RastaMouse](https://twitter.com/_RastaMouse)
 * [Mod_Rewrite Automatic Setup](https://blog.inspired-sec.com/archive/2017/04/17/Mod-Rewrite-Automatic-Setup.html) - [Julian Catrambone (@n0pe_sled)](https://twitter.com/n0pe_sled)
+* [Automated Empire Infrastructure](https://bneg.io/2017/11/06/automated-empire-infrastructure/) - [Jeremy Johnson (@beyondnegative)](https://twitter.com/beyondnegative)
+* [RTOps: Automating Redirector Deployment With Ansible](http://threat.tevora.com/automating-redirector-deployment-with-ansible/) - [Kevin Dick](http://threat.tevora.com/author/e0x70i/)
+* [Automating Gophish Releases With Ansible and Docker](https://jordan-wright.com/blog/post/2018-02-04-automating-gophish-releases/) - [Jordan Wright (@jw_sec)](https://twitter.com/jw_sec)
+* [Red Baron GitHub Repo](https://github.com/Coalfire-Research/Red-Baron) - [Marcello (@byt3bl33d3r)](https://twitter.com/byt3bl33d3r)
+* [Automating Apache mod_rewrite and Cobalt Strike Malleable C2 for Intelligent Redirection](http://threatexpress.com/2018/02/automating-cobalt-strike-profiles-apache-mod_rewrite-htaccess-files-intelligent-c2-redirection/) - [Joe Vest (@joevest)](https://twitter.com/joevest)
+* [Modular Infrastructure with Terraform](https://blog.smallsec.ca/2018/05/17/modular-infrastructure-with-terraform/) - [Liam Somerville (@liamsomerville)](https://twitter.com/liamsomerville)
 
 # General Tips
 * **Document everything** - Running a complex Red Team infrastructure means many moving parts. Be sure to document each asset’s function and where its traffic is sent.
@@ -511,7 +590,7 @@ Check out these resources about attack infrastructure automation:
 
 * **Don't go overboard** - It's easy to get excited about advanced techniques and want to throw the kitchen sink at a target. If you are emulating a specific adversarial threat, only leverage techniques the real threat actor used or techniques within the skillset of the threat actor. If your red team testing will attack the same target long-term, consider starting "easy" and working through the more advanced tradecraft as your assessments go on. Evolving the red team's technique alongside the blue team's will consistenly push the organization forward, whereas hitting the blue team with everything at once may overwhelm the blue team and slow the learning process.
 
-* **Monitor logs** - All logs should be monitored throughout the engagement: SMTP logs, Apache logs, tcpdump on socat redirectors, iptables logs (specific to traffic forwarding or targeted filtering), weblogs, Cobalt Strike/Empire/MSF logs. Forward logs to a central location, such as with [rsyslog](https://bluescreenofjeff.com/2017-08-08-attack-infrastructure-log-aggregation-and-monitoring/), for easier monitoring. Operator terminal data retention may come in handy for going over an historical command useage during an operation. @Killswitch_GUI created an easy-to-use program named lTerm that will log all bash terminal commands to a central location. [Log all terminal output with lTerm](https://github.com/killswitch-GUI/lterm)
+* **Monitor logs** - All logs should be monitored throughout the engagement: SMTP logs, Apache logs, tcpdump on socat redirectors, iptables logs (specific to traffic forwarding or targeted filtering), weblogs, Cobalt Strike/Empire/MSF logs. Forward logs to a central location, such as with [rsyslog](https://bluescreenofjeff.com/2017-08-08-attack-infrastructure-log-aggregation-and-monitoring/), for easier monitoring. Operator terminal data retention may come in handy for going over an historical command useage during an operation. @Killswitch_GUI created an easy-to-use program named lTerm that will log all bash terminal commands to a central location. [Log all terminal output with lTerm](https://github.com/killswitch-GUI/lterm). Check out Vincent Yiu's post [CobaltSplunk](https://vincentyiu.co.uk/cobaltsplunk/) for an example of how to send Cobalt Strike logs to Splunk for advanced infrastructure monitoring and analysis.
 
 * **Implement high-value event alerting** - Configure the attack infrastructure to generate alerts for high-value events, such as new C2 sessions or credential capture hits. One popular way of implementing alerting is via a chat platform's API, such as Slack. Check out the following posts about Slack alerting: [Slack Shell Bot - Russel Van Tuyl (@Ne0nd0g)](https://www.swordshield.com/2016/11/slackshellbot/), [Slack Notifications for Cobalt Strike - Andrew Chiles (@AndrewChiles)](http://threatexpress.com/2016/12/slack-notifications-for-cobalt-strike/), [Slack Bots for Trolls and Work - Jeff Dimmock (@bluscreenfojeff)](http://bluescreenofjeff.com/2017-04-11-slack-bots-for-trolls-and-work/)
 
@@ -533,5 +612,6 @@ A BIG THANK YOU to all the following people (listed alphabetically) who contribu
 * [@n0pe_sled - Julian Catrambone](https://twitter.com/n0pe_sled)
 * [@_RastaMouse](https://twitter.com/_RastaMouse)
 * [@tifkin_ - Lee Christensen](https://twitter.com/tifkin_)
+* [@Und3rf10w - Jonathan Echavarria](https://twitter.com/und3rf10w)
 * [@vysecurity - Vincent Yiu](https://twitter.com/vysecurity)
 * [@xorrior - Chris Ross](https://twitter.com/xorrior)
